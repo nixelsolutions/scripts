@@ -54,7 +54,7 @@ done
 [ -z "$MYSQL_SERVER" ] && echo "ERROR: Could not contact any of these servers: $MYSQL_SERVERS - Skipping backup..." && exit 1
 
 # If selected all databases, just select them from show databases
-[ "$MYSQL_DBS" = "all" ] && MYSQL_DBS=`echo "SHOW DATABASES" | $MYSQL_BIN_PATH/mysql --defaults-file=$MYSQL_CFG_FILE -B -s -h $MYSQL_SERVER -u $MYSQL_USER | tr '\n' ' '`
+[ "$MYSQL_DBS" = "all" ] && MYSQL_DBS=`echo "SHOW DATABASES" | mysql --defaults-file=$MYSQL_CFG_FILE -B -s -h $MYSQL_SERVER -u $MYSQL_USER -p$MYSQL_PASSWORD | tr '\n' ' '`
 [ -z "$MYSQL_DBS" ] && echo "ERROR: Could not obtain a database list from MySQL instance $MYSQL_INSTANCE - exiting..." && exit 1
 
 # Exclude databases
