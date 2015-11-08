@@ -30,16 +30,16 @@ done
 [ -z "$MYSQL_DBS" ] && echo "ERROR: Missing MySQL DBS parameter (-d) - exiting..." && exit 1
 [ -z "$RETENTION" ] && echo "ERROR: Missing RETENTION parameter (-r) - exiting..." && exit 1
 
-#MYSQL_CFG_FILE=/etc/mysql/backups.cnf
+MYSQL_CFG_FILE=/etc/mysql/backups.cnf
 MYSQL_USER=CHANGEME
 MYSQL_PASSWORD=CHANGEME
 
 EXCLUDE_DATABASES="information_schema performance_schema"
 
 # ENABLE THIS ONLY IF YOU HAVE FLUSH GRANTS
-#MYSQLDUMP_EXTRA="--single-transaction --flush-logs --hex-blob --master-data=2"
-[ ! -z ${MYSQL_CFG_FILE} ] && MYSQLDUMP_EXTRA="--defaults-file=${MYSQL_CFG_FILE} ${MYSQLDUMP_EXTRA}"
-[ ! -z ${MYSQL_PASSWORD} ] && MYSQLDUMP_EXTRA="-p$MYSQL_PASSWORD ${MYSQLDUMP_EXTRA}"
+[ ! -z ${MYSQL_CFG_FILE} ] && MYSQLDUMP_EXTRA+="--defaults-file=${MYSQL_CFG_FILE} "
+[ ! -z ${MYSQL_PASSWORD} ] && MYSQLDUMP_EXTRA+="-p$MYSQL_PASSWORD "
+MYSQLDUMP_EXTRA+="--single-transaction --flush-logs --hex-blob --master-data=2 "
 
 # Check connectivity with servers
 for SERVER in `echo $MYSQL_SERVERS | sed "s/,/ /g"`; do
@@ -87,7 +87,7 @@ for db in $MYSQL_DBS; do
     [ $? -ne 0 ] && echo "ERROR: Could not create directory $BKP_LONG_DIR - exiting..." && exit 1
   fi
 
-  mysqldump --skip-lock-tables -h $MYSQL_SERVER -u $MYSQL_USER "${MYSQLDUMP_EXTRA}" $db | gzip - > $BKP_FILE_PATH
+  mysqldump ${MYSQLDUMP_EXTRA} --skip-lock-tables -h $MYSQL_SERVER -u $MYSQL_USER $db | gzip - > $BKP_FILE_PATH
   if [ $? -ne 0 ]; then
      echo "Error backing up database $db ..."
      echo "Deleting file $BKP_FILE_PATH ..."
