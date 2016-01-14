@@ -63,5 +63,8 @@ async.waterfall([
 ],
 function (err, result) {
   if (err) throw new Error(err);
-  console.log('elbInfo = ' +JSON.stringify(result));
+//  result.forEach(function(lb) {
+//    console.log(lb.LoadBalancerName +"="+ JSON.stringify(lb));
+//  });
+    console.log(JSON.stringify(result));
 });
