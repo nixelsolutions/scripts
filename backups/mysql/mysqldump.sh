@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while getopts ":s:p:d:r:" opt; do
+while getopts ":s:p:d:r:o:" opt; do
    case $opt in
       s)
          MYSQL_SERVERS="$OPTARG"
@@ -13,6 +13,9 @@ while getopts ":s:p:d:r:" opt; do
       ;;
       r)
          RETENTION=$OPTARG
+      ;;
+      o)
+         MYSQL_PORT=$OPTARG
       ;;
       \?)
          echo "Invalid option: -$OPTARG" >&2
@@ -30,7 +33,7 @@ done
 [ -z "$MYSQL_DBS" ] && echo "ERROR: Missing MySQL DBS parameter (-d) - exiting..." && exit 1
 [ -z "$RETENTION" ] && echo "ERROR: Missing RETENTION parameter (-r) - exiting..." && exit 1
 
-MYSQL_CFG_FILE=/etc/mysql/backups.cnf
+MYSQL_CFG_FILE=/etc/my.cnf
 MYSQL_USER=CHANGEME
 MYSQL_PASSWORD=CHANGEME
 
@@ -38,13 +41,13 @@ EXCLUDE_DATABASES="information_schema performance_schema"
 
 # ENABLE THIS ONLY IF YOU HAVE FLUSH GRANTS
 [ ! -z ${MYSQL_CFG_FILE} ] && MYSQLDUMP_EXTRA+="--defaults-file=${MYSQL_CFG_FILE} "
-[ ! -z ${MYSQL_PASSWORD} ] && MYSQLDUMP_EXTRA+="-p$MYSQL_PASSWORD "
+[ ! -z ${MYSQL_PASSWORD} ] && MYSQLDUMP_EXTRA+="-p$MYSQL_PASSWORD " && MYSQL_PASSWORD="-p$MYSQL_PASSWORD "
 MYSQLDUMP_EXTRA+="--single-transaction --flush-logs --hex-blob --master-data=2 "
 
 # Check connectivity with servers
 for SERVER in `echo $MYSQL_SERVERS | sed "s/,/ /g"`; do
    echo "Testing connectivity with server $SERVER ..."
-   echo "SELECT 1 FROM DUAL" | mysql -B -s -h $SERVER -u $MYSQL_USER -p$MYSQL_PASSWORD >/dev/null 2>&1
+   echo "SELECT 1 FROM DUAL" | mysql -B -s -h $SERVER -P ${MYSQL_PORT-3306} -u $MYSQL_USER ${MYSQL_PASSWORD} >/dev/null 2>&1
    if [ $? -eq 0 ]; then
       MYSQL_SERVER=$SERVER
       echo "Server $MYSQL_SERVER is up, using this server for backing up..."
@@ -57,7 +60,7 @@ done
 [ -z "$MYSQL_SERVER" ] && echo "ERROR: Could not contact any of these servers: $MYSQL_SERVERS - Skipping backup..." && exit 1
 
 # If selected all databases, just select them from show databases
-[ "$MYSQL_DBS" = "all" ] && MYSQL_DBS=`echo "SHOW DATABASES" | mysql -B -s -h $MYSQL_SERVER -u $MYSQL_USER -p$MYSQL_PASSWORD | tr '\n' ' '`
+[ "$MYSQL_DBS" = "all" ] && MYSQL_DBS=`echo "SHOW DATABASES" | mysql -B -s -h $MYSQL_SERVER -P ${MYSQL_PORT-3306} -u $MYSQL_USER $MYSQL_PASSWORD | tr '\n' ' '`
 [ -z "$MYSQL_DBS" ] && echo "ERROR: Could not obtain a database list from MySQL instance $MYSQL_INSTANCE - exiting..." && exit 1
 
 # Exclude databases
