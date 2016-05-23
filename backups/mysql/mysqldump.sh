@@ -71,6 +71,10 @@ done
 for db in $MYSQL_DBS; do
   DATE=`date +%Y%m%d-%H%M%S`
 
+  if [ ${db} == "all-single-file" ]; then
+    db=mysql-all-databases
+  fi
+
   BKP_SHORT_DIR=$MYSQL_BACKUP_PATH/short/$db
   BKP_LONG_DIR=$MYSQL_BACKUP_PATH/long/$db
   BKP_FILENAME=$BKP_SHORT_DIR/$db.$DATE
@@ -79,6 +83,10 @@ for db in $MYSQL_DBS; do
   BKP_FILE_EXTENSION=sql.gz
   BKP_FILE_PATH=${BKP_FILENAME}.${BKP_FILE_EXTENSION}
   BKP_PATH=`dirname $BKP_FILE_PATH`
+
+  if [ ${db} == "mysql-all-databases" ]; then
+    db="--all-databases"
+  fi
 
   if [ ! -d $BKP_SHORT_DIR ]; then
     mkdir -p $BKP_SHORT_DIR
@@ -96,6 +104,10 @@ for db in $MYSQL_DBS; do
      echo "Deleting file $BKP_FILE_PATH ..."
      rm -f $BKP_FILE_PATH
      exit 1
+  fi
+
+  if [ ${db} == "all-databases" ]; then
+    db=mysql-all-databases
   fi
 
   # Delete old backups - short
