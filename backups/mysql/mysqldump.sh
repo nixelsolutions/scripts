@@ -98,7 +98,7 @@ for db in $MYSQL_DBS; do
     [ $? -ne 0 ] && echo "ERROR: Could not create directory $BKP_LONG_DIR - exiting..." && exit 1
   fi
 
-  mysqldump ${MYSQLDUMP_EXTRA} --skip-lock-tables -h $MYSQL_SERVER -u $MYSQL_USER $db | gzip - > $BKP_FILE_PATH
+  mysqldump ${MYSQLDUMP_EXTRA} --skip-lock-tables -h $MYSQL_SERVER -P ${MYSQL_PORT-3306} -u $MYSQL_USER $db | gzip - > $BKP_FILE_PATH
   if [ $? -ne 0 ]; then
      echo "Error backing up database $db ..."
      echo "Deleting file $BKP_FILE_PATH ..."
