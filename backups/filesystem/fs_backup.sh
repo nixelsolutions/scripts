@@ -75,6 +75,7 @@ for SERVER in `cat $CFG_FILE | awk -F: '{print $1}' | awk -F@ '{print $2}' | sor
   DEST_PATH_LONG=$BACKUP_PATH/$SERVER/long
   DEST_PATH_BASE=$BACKUP_PATH/$SERVER/$BACKUP_TYPE/$DATE
   DEST_GZIP_FILE=$DEST_PATH_BASE.tar.bz2
+  LOG_FILE=$DEST_PATH_BASE.log
 
   echo "Compressing backup directory with ID: $DEST_PATH_BASE on file $DEST_GZIP_FILE ..."
   pushd `dirname $DEST_PATH_BASE`
