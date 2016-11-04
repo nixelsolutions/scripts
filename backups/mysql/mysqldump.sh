@@ -106,7 +106,7 @@ for db in $MYSQL_DBS; do
      exit 1
   fi
 
-  if [ ${db} == "all-databases" ]; then
+  if [ ${db} == "--all-databases" ]; then
     db=mysql-all-databases
   fi
 
