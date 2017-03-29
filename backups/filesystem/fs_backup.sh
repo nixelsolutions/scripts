@@ -74,12 +74,12 @@ for SERVER in `cat $CFG_FILE | awk -F: '{print $1}' | awk -F@ '{print $2}' | sor
   DEST_PATH_SHORT=$BACKUP_PATH/$SERVER/short
   DEST_PATH_LONG=$BACKUP_PATH/$SERVER/long
   DEST_PATH_BASE=$BACKUP_PATH/$SERVER/$BACKUP_TYPE/$DATE
-  DEST_GZIP_FILE=$DEST_PATH_BASE.tar.bz2
+  DEST_GZIP_FILE=$DEST_PATH_BASE.tar.gz
   LOG_FILE=$DEST_PATH_BASE.log
 
   echo "Compressing backup directory with ID: $DEST_PATH_BASE on file $DEST_GZIP_FILE ..."
   pushd `dirname $DEST_PATH_BASE`
-  tar cjf $DEST_GZIP_FILE `basename $LOG_FILE` `basename $DEST_PATH_BASE`
+  tar czf $DEST_GZIP_FILE `basename $LOG_FILE` `basename $DEST_PATH_BASE`
   if [ $? -ne 0 ]; then
     echo "Error compressing directory with ID: $DEST_PATH_BASE ..."
     echo "Deleting file $DEST_GZIP_FILE"
