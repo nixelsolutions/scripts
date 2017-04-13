@@ -91,7 +91,7 @@ fi
 get_status() {
   status_page="http://${hostname}:${port}/_nodes/stats"
 
-  if ! nc -zw ${timeout} ${hostname} ${port} 2>/dev/null; then
+  if ! curl -m ${timeout} -sSL ${user} ${pass} ${status_page} >/dev/null 2>&1; then
     return 1
   fi
 
@@ -126,7 +126,7 @@ isProxyNode: ${isProxyNode}"
 }
 
 do_perfdata() {
-    perfdata="'heap_used_percent'=${heap_used_percent}"
+    perfdata="'heap_used_percent'=${heap_used_percent}%"
 }
 
 do_exit_status() {
