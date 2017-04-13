@@ -66,7 +66,7 @@ while test -n "$1"; do
             critical_heap=$2
             shift
             ;;
-        --timeout|-o)
+        --timeout|-t)
             timeout=$2
             shift
             ;;
