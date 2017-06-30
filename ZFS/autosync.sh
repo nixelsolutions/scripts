@@ -207,44 +207,50 @@ function cleanup_snapshots() {
   done
 }
 
-function list_remote_snapshots() {
+function list_snapshots_remote() {
   ALL_SNAPSHOTS_REMOTE=`ssh ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep "^${FILESYSTEM}@${SNAPSHOT_PREFIX}-" | sort -n | head -n -1"`
 }
 
-function cleanup_hourly_remote_snapshots() {
-  list_remote_snapshots
+function cleanup_snapshots_remote() {  
+  DAYS_RETENTION_TIMESTAMP=`date -d "-${DAILY_RETENTION} day" +%s`
+  HOURS_RETENTION_TIMESTAMP=`date -d "-${HOURLY_RETENTION} hour" +%s`
 
-  KEEP_HOURLY_SNAPSHOTS=()
-  for ((i=0; i<${HOURLY_RETENTION}; i++)); do
-    KEEP_HOURLY_SNAPSHOTS+=("$(date +"%Y%m%d-%H" -d "-$i hour")")
+  # Delete old snapshots (timestamp < DAYS_RETENTION_TIMESTAMP && timestamp < HOURS_RETENTION_TIMESTAMP)
+  list_snapshots_remote
+  for SNAPSHOT in ${ALL_SNAPSHOTS_REMOTE}; do
+    SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
+    
+    if [ ${SNAPSHOT_TIMESTAMP} -lt ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -lt ${HOURS_RETENTION_TIMESTAMP} ]; then
+      echo "DEBUG: Snapshot ${SNAPSHOT} is older than DAILY_RETENTION and HOURLY_RETENTION, deleting it"
+      #delete_snapshot_remote ${SNAPSHOT}
+    fi
   done
 
-  for HOUR in ${KEEP_HOURLY_SNAPSHOTS[@]}; do
-    THIS_HOUR_SNAPSHOTS=()
-    for SNAPSHOT in `echo "${ALL_SNAPSHOTS_REMOTE}" | grep "^${FILESYSTEM}@${SNAPSHOT_PREFIX}-${HOUR}" | sort -n`; do
-      THIS_HOUR_SNAPSHOTS+=("${SNAPSHOT}")
-    done
-    for DELETE_HOUR_SNAPSHOT in `echo "${THIS_HOUR_SNAPSHOTS[@]}" | tr ' ' '\n' | sort -n | tail -n +2`; do
-      delete_snapshot_remote ${DELETE_HOUR_SNAPSHOT}
+  # Delete old daily snapshots (timestamp >= DAYS_RETENTION_TIMESTAMP && timestamp < HOURS_RETENTION_TIMESTAMP)
+  list_snapshots_remote
+  for SNAPSHOT_DAY in `echo "${ALL_SNAPSHOTS_REMOTE}" | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | awk -F- '{print $1}' | sort -n | uniq`; do
+    # We add "tail -n +2" to preserve the first daily snapshot
+    for SNAPSHOT in `echo "${ALL_SNAPSHOTS_REMOTE}" | grep "\-${SNAPSHOT_DAY}-" | sort -n | tail -n +2`; do
+      SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
+
+      if [ ${SNAPSHOT_TIMESTAMP} -ge ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -lt ${HOURS_RETENTION_TIMESTAMP} ]; then
+        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION, but older than HOURLY_RETENTION, deleting it"    
+        delete_snapshot_remote ${SNAPSHOT}  
+      fi
     done
   done
-}
 
-function cleanup_daily_remote_snapshots() {
-  list_remote_snapshots
+  # Delete old hourly snapshots (timestamp >= DAYS_RETENTION_TIMESTAMP && timestamp >= HOURS_RETENTION_TIMESTAMP)
+  list_snapshots_remote
+  for SNAPSHOT_HOUR in `echo "${ALL_SNAPSHOTS_REMOTE}" | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | awk -F: '{print $1}' | sort -n | uniq`; do
+    # We add "tail -n +2" to preserve the first hourly snapshot
+    for SNAPSHOT in `echo "${ALL_SNAPSHOTS_REMOTE}" | grep "\-${SNAPSHOT_HOUR}:" | sort -n | tail -n +2`; do
+      SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
 
-  KEEP_DAILY_SNAPSHOTS=()
-  for ((i=1; i<${DAILY_RETENTION}; i++)); do
-    KEEP_DAILY_SNAPSHOTS+=("$(date +"%Y%m%d" -d "-$i day")")
-  done
-
-  for DAY in ${KEEP_DAILY_SNAPSHOTS[@]}; do
-    THIS_DAY_SNAPSHOTS=()
-    for SNAPSHOT in `echo "${ALL_SNAPSHOTS}" | grep "^${FILESYSTEM}@${SNAPSHOT_PREFIX}-${DAY}" | sort -n`; do
-      THIS_DAY_SNAPSHOTS+=("${SNAPSHOT}")
-    done
-    for DELETE_DAY_SNAPSHOT in `echo "${THIS_DAY_SNAPSHOTS[@]}" | tr ' ' '\n' | sort -n | tail -n +2`; do
-      echo "INFO: Deleting daily snapshot ${DELETE_DAY_SNAPSHOT} on remote server ${RECEIVER_IP}"
+      if [ ${SNAPSHOT_TIMESTAMP} -ge ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -ge ${HOURS_RETENTION_TIMESTAMP} ]; then
+        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION and HOURLY_RETENTION, deleting it"    
+        delete_snapshot_remote ${SNAPSHOT}  
+      fi
     done
   done
 }
@@ -261,12 +267,10 @@ case ${OPERATION} in
   sync_remote)
     check_requisites
     send_snapshot_files_to_remote
-    cleanup_hourly_remote_snapshots
-    cleanup_daily_remote_snapshots
+    cleanup_snapshots_remote
   ;;
   delete_remote_snapshots)
     check_requisites
-    cleanup_hourly_remote_snapshots
-    cleanup_daily_remote_snapshots
+    cleanup_snapshots_remote
   ;;
 esac
