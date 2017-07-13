@@ -189,10 +189,10 @@ function send_snapshot_files_to_remote() {
       delete_snapshot_file ${SNAPSHOT_FILE_PATH}
       continue
     else
-      echo "INFO: Sending snapshot file ${SNAPSHOT_FILE_PATH} to remote ${RECEIVER_IP}, filesystem is ${FILESYSTEM}"
-      zcat ${SNAPSHOT_FILE_PATH} | ssh ${RECEIVER_IP} "zfs recv ${FILESYSTEM}"
-      echo "INFO: Applying snapshot ${local_snapshot} on remote ${RECEIVER_IP}"
-      ssh ${RECEIVER_IP} "zfs rollback ${local_snapshot}"
+      echo "INFO: Sending && applying snapshot file ${SNAPSHOT_FILE_PATH} to remote ${RECEIVER_IP}, filesystem is ${FILESYSTEM}"
+      zcat ${SNAPSHOT_FILE_PATH} | ssh ${RECEIVER_IP} "zfs recv ${FILESYSTEM} && zfs rollback ${local_snapshot}"
+      #echo "INFO: Applying snapshot ${local_snapshot} on remote ${RECEIVER_IP}"
+      #ssh ${RECEIVER_IP} "zfs rollback ${local_snapshot}"
       delete_snapshot_file ${SNAPSHOT_FILE_PATH}
     fi
   done
@@ -211,7 +211,7 @@ function list_snapshots_remote() {
   ALL_SNAPSHOTS_REMOTE=`ssh ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep "^${FILESYSTEM}@${SNAPSHOT_PREFIX}-" | sort -n | head -n -1"`
 }
 
-function cleanup_snapshots_remote() {  
+function cleanup_snapshots_remote() {
   DAYS_RETENTION_TIMESTAMP=`date -d "-${DAILY_RETENTION} day" +%s`
   HOURS_RETENTION_TIMESTAMP=`date -d "-${HOURLY_RETENTION} hour" +%s`
 
@@ -219,10 +219,10 @@ function cleanup_snapshots_remote() {
   list_snapshots_remote
   for SNAPSHOT in ${ALL_SNAPSHOTS_REMOTE}; do
     SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
-    
+
     if [ ${SNAPSHOT_TIMESTAMP} -lt ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -lt ${HOURS_RETENTION_TIMESTAMP} ]; then
       echo "DEBUG: Snapshot ${SNAPSHOT} is older than DAILY_RETENTION and HOURLY_RETENTION, deleting it"
-      #delete_snapshot_remote ${SNAPSHOT}
+      delete_snapshot_remote ${SNAPSHOT}
     fi
   done
 
@@ -234,8 +234,8 @@ function cleanup_snapshots_remote() {
       SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
 
       if [ ${SNAPSHOT_TIMESTAMP} -ge ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -lt ${HOURS_RETENTION_TIMESTAMP} ]; then
-        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION, but older than HOURLY_RETENTION, deleting it"    
-        delete_snapshot_remote ${SNAPSHOT}  
+        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION, but older than HOURLY_RETENTION, deleting it"
+        delete_snapshot_remote ${SNAPSHOT}
       fi
     done
   done
@@ -248,8 +248,8 @@ function cleanup_snapshots_remote() {
       SNAPSHOT_TIMESTAMP=`date -d "$(echo ${SNAPSHOT} | awk -F"@${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /")" +%s`
 
       if [ ${SNAPSHOT_TIMESTAMP} -ge ${DAYS_RETENTION_TIMESTAMP} -a ${SNAPSHOT_TIMESTAMP} -ge ${HOURS_RETENTION_TIMESTAMP} ]; then
-        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION and HOURLY_RETENTION, deleting it"    
-        delete_snapshot_remote ${SNAPSHOT}  
+        echo "DEBUG: Snapshot ${SNAPSHOT} is newer than DAILY_RETENTION and HOURLY_RETENTION, deleting it"
+        delete_snapshot_remote ${SNAPSHOT}
       fi
     done
   done
