@@ -8,7 +8,7 @@ CURRENT_TIME=`date +%Y%m%d-%H:%M:%S`
 
 . /lib/lsb/init-functions
 
-while getopts ":v:m:s:h:d:f:o:" opt; do
+while getopts ":v:m:s:h:d:f:o:p:" opt; do
    case $opt in
       v)
          VIRTUAL_IP=$OPTARG
@@ -30,6 +30,9 @@ while getopts ":v:m:s:h:d:f:o:" opt; do
       ;;
       o)
          OPERATION=`echo $OPTARG | tr '[:upper:]' '[:lower:]'`
+      ;;
+      p)
+         SNAPSHOT_PREFIX=$OPTARG
       ;;
       \?)
          echo "Invalid option: -$OPTARG" >&2
