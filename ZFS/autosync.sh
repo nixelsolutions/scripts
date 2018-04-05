@@ -8,7 +8,7 @@ CURRENT_TIME=`date +%Y%m%d-%H:%M:%S`
 
 . /lib/lsb/init-functions
 
-while getopts ":v:m:s:h:d:f:o:p:" opt; do
+while getopts ":v:m:s:h:d:f:F:o:p:" opt; do
    case $opt in
       v)
          VIRTUAL_IP=$OPTARG
@@ -27,6 +27,9 @@ while getopts ":v:m:s:h:d:f:o:p:" opt; do
       ;;
       f)
          FILESYSTEM=$OPTARG
+      ;;
+      F)
+         FILESYSTEM_DEST=$OPTARG
       ;;
       o)
          OPERATION=`echo $OPTARG | tr '[:upper:]' '[:lower:]'`
@@ -51,12 +54,17 @@ done
 [ -z "${HOURLY_RETENTION}" ] && echo "ERROR: Missing HOURLY_RETENTION parameter (-h) - exiting..." && exit 1
 [ -z "${DAILY_RETENTION}" ] && echo "ERROR: Missing DAILY_RETENTION parameter (-d) - exiting..." && exit 1
 [ -z "${FILESYSTEM}" ] && echo "ERROR: Missing FILESYSTEM parameter (-f) - exiting..." && exit 1
+[ -z "${FILESYSTEM_DEST}" ] && FILESYSTEM_DEST=${FILESYSTEM}
 [ -z "${OPERATION}" ] && echo "ERROR: Missing OPERATION parameter (-o) - exiting..." && exit 1
 
 function check_requisites() {
   # Remove slashes from FILESYSTEM
   FILESYSTEM=${FILESYSTEM%/}
   FILESYSTEM=${FILESYSTEM#/}
+
+  # Remove slashes from FILESYSTEM_DEST
+  FILESYSTEM_DEST=${FILESYSTEM_DEST%/}
+  FILESYSTEM_DEST=${FILESYSTEM_DEST#/}
 
   # First condition: VIRTUAL_IP should be assigned locally
   if ! ip addr | grep "inet ${VIRTUAL_IP}/" >/dev/null; then
@@ -106,6 +114,10 @@ function find_last_snapshot() {
 
 function find_last_snapshot_remote() {
   LAST_SNAPSHOT_REMOTE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1"`
+}
+
+function find_last_snapshot_remote_size() {
+  LAST_SNAPSHOT_REMOTE_SIZE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1 | xargs -i zfs list -H -t snapshot -o used {}"`
 }
 
 function create_snapshot() {
@@ -187,15 +199,22 @@ function send_snapshot_files_to_remote() {
     last_snapshot_remote_date=`echo ${LAST_SNAPSHOT_REMOTE} | awk -F"${SNAPSHOT_PREFIX}-" '{print $2}' | sed "s/-/ /g"`
     last_snapshot_remote_timestamp=`date --date="${last_snapshot_remote_date}" +%s`
     local_snapshot=${FILESYSTEM}@${SNAPSHOT_PREFIX}-`echo ${local_snapshot_date} | sed "s/ /-/g"`
+    remote_snapshot=${FILESYSTEM_DEST}@${SNAPSHOT_PREFIX}-`echo ${local_snapshot_date} | sed "s/ /-/g"`
     SNAPSHOT_FILE_PATH=/snapshots/${FILESYSTEM}/${SNAPSHOT_PREFIX}-`echo ${local_snapshot_date} | sed "s/ /-/g"`.gz
     if [ ${local_snapshot_timestamp} -le ${last_snapshot_remote_timestamp} ]; then
       delete_snapshot_file ${SNAPSHOT_FILE_PATH}
       continue
     else
-      echo "INFO: Sending && applying snapshot file ${SNAPSHOT_FILE_PATH} to remote ${RECEIVER_IP}, filesystem is ${FILESYSTEM}"
-      zcat ${SNAPSHOT_FILE_PATH} | ssh ${RECEIVER_IP} "zfs recv ${FILESYSTEM} && zfs rollback ${local_snapshot}"
-      #echo "INFO: Applying snapshot ${local_snapshot} on remote ${RECEIVER_IP}"
-      #ssh ${RECEIVER_IP} "zfs rollback ${local_snapshot}"
+      find_last_snapshot_remote_size
+      if [ a"${LAST_SNAPSHOT_REMOTE_SIZE}" != "a" -a ${LAST_SNAPSHOT_REMOTE_SIZE} != "0" -a ${LAST_SNAPSHOT_REMOTE_SIZE} != "1K" ]; then
+        echo "WARNING: Remote snapshot ${LAST_SNAPSHOT_REMOTE} size is ${LAST_SNAPSHOT_REMOTE_SIZE} - Rolling back to it!"
+        ssh ${RECEIVER_IP} "zfs rollback ${LAST_SNAPSHOT_REMOTE}"
+        sleep 5
+      fi
+      echo "INFO: Sending snapshot file ${SNAPSHOT_FILE_PATH} to remote ${RECEIVER_IP}, filesystem is ${FILESYSTEM}"
+      zcat ${SNAPSHOT_FILE_PATH} | ssh ${RECEIVER_IP} "zfs recv ${FILESYSTEM_DEST}"
+      echo "INFO: Applying snapshot ${remote_snapshot} on remote ${RECEIVER_IP}"
+      ssh ${RECEIVER_IP} "zfs rollback ${remote_snapshot}"
       delete_snapshot_file ${SNAPSHOT_FILE_PATH}
     fi
   done
