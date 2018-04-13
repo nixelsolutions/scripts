@@ -113,11 +113,11 @@ function find_last_snapshot() {
 }
 
 function find_last_snapshot_remote() {
-  LAST_SNAPSHOT_REMOTE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1"`
+  LAST_SNAPSHOT_REMOTE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM_DEST}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1"`
 }
 
 function find_last_snapshot_remote_size() {
-  LAST_SNAPSHOT_REMOTE_SIZE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1 | xargs -i zfs list -H -t snapshot -o used {}"`
+  LAST_SNAPSHOT_REMOTE_SIZE=`ssh -o "stricthostkeychecking no" ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep \"^${FILESYSTEM_DEST}@${SNAPSHOT_PREFIX}-\" | sort -n | tail -1 | xargs -i zfs list -H -t snapshot -o used {}"`
 }
 
 function create_snapshot() {
