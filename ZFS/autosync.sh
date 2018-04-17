@@ -230,7 +230,7 @@ function cleanup_snapshots() {
 }
 
 function list_snapshots_remote() {
-  ALL_SNAPSHOTS_REMOTE=`ssh ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep "^${FILESYSTEM}@${SNAPSHOT_PREFIX}-" | sort -n | head -n -1"`
+  ALL_SNAPSHOTS_REMOTE=`ssh ${RECEIVER_IP} "zfs list -H -t snapshot -o name | grep "^${FILESYSTEM_DEST}@${SNAPSHOT_PREFIX}-" | sort -n | head -n -1"`
 }
 
 function cleanup_snapshots_remote() {
