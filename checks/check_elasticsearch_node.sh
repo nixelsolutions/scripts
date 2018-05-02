@@ -7,8 +7,8 @@ ST_UK=3
 
 hostname=localhost
 port=9200
-warning_heap=60
-critical_heap=80
+warning_heap=75
+critical_heap=85
 timeout=5
 
 # Check dependencies
@@ -96,14 +96,22 @@ get_status() {
   fi
 
   # Search using IP
-  es_status=`curl -m ${timeout} -sSL ${user} ${pass} ${status_page} | jq .nodes | jq ".[] | select(.ip[] | contains(\"${hostname}\"))"`
+  es_status=`curl -m ${timeout} -sSL ${user} ${pass} ${status_page} | jq .nodes | jq ".[] | select(.ip[] | contains(\"${hostname}\"))" 2>/dev/null`
+  if [ $? -ne 0 ]; then
+    es_status=`curl -m ${timeout} -sSL ${user} ${pass} ${status_page} | jq .nodes | jq ".[] | select(.ip | contains(\"${hostname}\"))" 2>/dev/null`
+  fi
   # Search using Hostname
   if [ a"${es_status}" == "a" ]; then
     es_status=`curl -m ${timeout} -sSL ${user} ${pass} ${status_page} | jq .nodes | jq ".[] | select(.name==\"${hostname}\")"`
   fi
 }
 
-get_vals() {
+get_version() {
+  version_page="http://${hostname}:${port}"
+  ES_VERSION=`curl -m ${timeout} -sSL ${user} ${pass} ${version_page} | jq -r ".version.number"`
+}
+
+get_vals_v1() {
   name=`echo ${es_status} | jq -r .name`
   heap_used_percent=`echo ${es_status} | jq -r .jvm.mem.heap_used_percent`
 
@@ -111,6 +119,20 @@ get_vals() {
   isMasterNode=${isMasterNode:-false}
   isDataNode=`echo ${es_status} | jq -r .attributes.data | grep -v null`
   isDataNode=${isDataNode:-true}
+  isProxyNode=false
+  if [ a"${isMasterNode}" == a"false" -a a"${isDataNode}" == a"false" ]; then
+    isProxyNode=true
+  fi
+}
+
+get_vals_v6() {
+  name=`echo ${es_status} | jq -r .name`
+  heap_used_percent=`echo ${es_status} | jq -r .jvm.mem.heap_used_percent`
+
+  isMasterNode=`echo ${es_status} | jq -r .roles[] | grep "^master$" | sed "s/master/true/g"`
+  isMasterNode=${isMasterNode:-false}
+  isDataNode=`echo ${es_status} | jq -r .roles[] | grep "^data$"`
+  isDataNode=${isDataNode:-false}
   isProxyNode=false
   if [ a"${isMasterNode}" == a"false" -a a"${isDataNode}" == a"false" ]; then
     isProxyNode=true
@@ -165,7 +187,12 @@ if ! get_status; then
   exit ${ST_CR}
 fi
 
-get_vals
+get_version
+if dpkg --compare-versions ${ES_VERSION} lt 2.0; then
+  get_vals_v1
+elif dpkg --compare-versions ${ES_VERSION} lt 7.0 ; then
+  get_vals_v6
+fi
 
 if [ a"${name}" == "a" ]; then
   echo "CRITICAL - Error parsing server output"
@@ -178,3 +205,4 @@ do_exit_status
 
 echo "${EXIT_STATUS}: ${EXIT_MESSAGE:-"All good"} - ${output} | ${perfdata}"
 exit ${EXIT_CODE}
+
