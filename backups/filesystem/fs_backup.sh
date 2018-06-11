@@ -43,7 +43,13 @@ for BACKUP in `cat $CFG_FILE`; do
 
   USER=`echo $BACKUP | awk -F: '{print $1}' | awk -F@ '{print $1}'`
   SERVER=`echo $BACKUP | awk -F: '{print $1}' | awk -F@ '{print $2}'`
-  SOURCE_PATH=`echo $BACKUP | awk -F: '{print $2}'`
+  PORT=`echo $BACKUP | awk -F: '{print $2}'`
+  SOURCE_PATH=`echo $BACKUP | awk -F: '{print $3}'`
+  if [ a"${SOURCE_PATH}" == "a" ]; then
+    SOURCE_PATH=${PORT}
+  else
+    SSH_OPTS+=" -p ${PORT}"
+  fi
   DEST_PATH_BASE=$BACKUP_PATH/$SERVER/$BACKUP_TYPE/$DATE
   DEST_PATH=$DEST_PATH_BASE/`basename $SOURCE_PATH`
   LOG_FILE=$DEST_PATH_BASE.log
@@ -59,7 +65,7 @@ for BACKUP in `cat $CFG_FILE`; do
   fi
 
   echo "Starting backing up backup with ID: $BACKUP"
-  rsync $RSYNC_OPTS -e "ssh $SSH_OPTS" --log-file=$LOG_FILE $USER@$SERVER:$SOURCE_PATH `dirname $DEST_PATH/`
+  ionice -c3 rsync $RSYNC_OPTS -e "ssh $SSH_OPTS" --log-file=$LOG_FILE $USER@$SERVER:$SOURCE_PATH `dirname $DEST_PATH/`
   if [ $? -ne 0 ]; then
     echo "Error backing up backup with ID: $BACKUP ..."
     echo "Deleting directory $DEST_PATH"
@@ -79,7 +85,7 @@ for SERVER in `cat $CFG_FILE | awk -F: '{print $1}' | awk -F@ '{print $2}' | sor
 
   echo "Compressing backup directory with ID: $DEST_PATH_BASE on file $DEST_GZIP_FILE ..."
   pushd `dirname $DEST_PATH_BASE`
-  tar czf $DEST_GZIP_FILE `basename $LOG_FILE` `basename $DEST_PATH_BASE`
+  ionice -c3 tar czf $DEST_GZIP_FILE `basename $LOG_FILE` `basename $DEST_PATH_BASE`
   if [ $? -ne 0 ]; then
     echo "Error compressing directory with ID: $DEST_PATH_BASE ..."
     echo "Deleting file $DEST_GZIP_FILE"
